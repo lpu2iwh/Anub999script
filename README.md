@@ -1,5 +1,6 @@
 -- Brookhaven Hub with ESP toggle script for Roblox
 -- Adapted for mobile users with a floating toggle button and troll options
+-- Improved dropdown with scrolling and fixed pull/kill functionality, plus ZIndex fixes
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,7 +16,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 320, 0, 360) -- Increased height for troll options
+mainFrame.Size = UDim2.new(0, 320, 0, 360) -- Height for troll options
 mainFrame.Position = UDim2.new(0.5, -160, 0.5, -180)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -34,6 +35,7 @@ title.BackgroundTransparency = 1
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 24
+title.ZIndex = 10
 title.Parent = mainFrame
 
 local closeButton = Instance.new("TextButton")
@@ -44,6 +46,7 @@ closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.TextColor3 = Color3.new(1,1,1)
 closeButton.Font = Enum.Font.GothamBold
 closeButton.TextSize = 20
+closeButton.ZIndex = 11
 closeButton.Parent = mainFrame
 
 closeButton.MouseButton1Click:Connect(function()
@@ -59,6 +62,7 @@ espToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 espToggleButton.TextColor3 = Color3.new(1,1,1)
 espToggleButton.Font = Enum.Font.GothamBold
 espToggleButton.TextSize = 22
+espToggleButton.ZIndex = 10
 espToggleButton.Parent = mainFrame
 
 -- Troll Options Frame
@@ -68,6 +72,7 @@ trollFrame.Position = UDim2.new(0, 10, 0, 110)
 trollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 trollFrame.Parent = mainFrame
 trollFrame.ClipsDescendants = true
+trollFrame.ZIndex = 10
 
 local trollTitle = Instance.new("TextLabel")
 trollTitle.Text = "Opções de Troll"
@@ -76,6 +81,7 @@ trollTitle.BackgroundTransparency = 1
 trollTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 trollTitle.Font = Enum.Font.GothamBold
 trollTitle.TextSize = 20
+trollTitle.ZIndex = 10
 trollTitle.Parent = trollFrame
 
 -- Player Selection Dropdown
@@ -90,20 +96,26 @@ playerDropdown.TextColor3 = Color3.new(1,1,1)
 playerDropdown.Font = Enum.Font.GothamBold
 playerDropdown.TextSize = 20
 playerDropdown.AutoButtonColor = true
+playerDropdown.ZIndex = 11
 playerDropdown.Parent = trollFrame
 
 local dropdownOpen = false
-local dropdownFrame = Instance.new("Frame")
+
+-- Use ScrollingFrame for player list to allow scrolling if list is long
+local dropdownFrame = Instance.new("ScrollingFrame")
 dropdownFrame.Size = UDim2.new(0.9, 0, 0, 150)
 dropdownFrame.Position = UDim2.new(0.05, 0, 0, 85)
 dropdownFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 dropdownFrame.Visible = false
-dropdownFrame.ClipsDescendants = true
+dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+dropdownFrame.ScrollBarThickness = 6
+dropdownFrame.BorderSizePixel = 0
+dropdownFrame.ZIndex = 20 -- High ZIndex to be on top of buttons
 dropdownFrame.Parent = trollFrame
 
-local UIPadding = Instance.new("UIPadding")
-UIPadding.PaddingLeft = UDim.new(0, 5)
-UIPadding.Parent = dropdownFrame
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = dropdownFrame
 
 local function updateDropdownPlayers()
     -- Clear existing buttons
@@ -113,29 +125,31 @@ local function updateDropdownPlayers()
         end
     end
 
-    local yPos = 0
+    local count = 0
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -10, 0, 30)
-            btn.Position = UDim2.new(0, 0, 0, yPos)
             btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
             btn.TextColor3 = Color3.new(1,1,1)
             btn.Font = Enum.Font.GothamSemibold
             btn.TextSize = 18
             btn.Text = player.Name
             btn.AutoButtonColor = true
+            btn.LayoutOrder = count + 1
             btn.Parent = dropdownFrame
 
             btn.MouseButton1Click:Connect(function()
                 selectedPlayer = player
-                playerDropdown.Text = "Jogador: "..player.Name
+                playerDropdown.Text = "Jogador: " .. player.Name
                 dropdownFrame.Visible = false
                 dropdownOpen = false
             end)
-            yPos = yPos + 35
+            count = count + 1
         end
     end
+    -- Update CanvasSize to fit contents
+    dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end
 
 playerDropdown.MouseButton1Click:Connect(function()
@@ -148,7 +162,6 @@ end)
 
 -- Troll Buttons
 
--- Utility function to get HumanRootPart safely
 local function getRootPart(player)
     if player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
@@ -159,7 +172,7 @@ local function getRootPart(player)
     return nil
 end
 
--- Troll: Pull Player with Sofa
+-- Pull Player with Sofa troll
 local pullButton = Instance.new("TextButton")
 pullButton.Text = "Puxar com Sofá"
 pullButton.Size = UDim2.new(0.9, 0, 0, 40)
@@ -168,27 +181,50 @@ pullButton.BackgroundColor3 = Color3.fromRGB(80, 170, 255)
 pullButton.TextColor3 = Color3.new(1,1,1)
 pullButton.Font = Enum.Font.GothamBold
 pullButton.TextSize = 20
+pullButton.ZIndex = 11
 pullButton.Parent = trollFrame
 
+local pulling = false
 pullButton.MouseButton1Click:Connect(function()
-    if selectedPlayer == nil then return end
+    if not selectedPlayer then return end
+    if pulling then
+        pulling = false
+        pullButton.Text = "Puxar com Sofá"
+        return
+    end
     local root = getRootPart(selectedPlayer)
     local localRoot = getRootPart(localPlayer)
     if root and localRoot then
-        -- Simulate pulling by tweening the target closer to local player
-        local distance = (root.Position - localRoot.Position).Magnitude
-        if distance > 50 then
-            -- Too far, no action
-            return
+        -- Create BodyPosition to pull player towards local player
+        if selectedPlayer.Character and not root:FindFirstChild("PullBodyPosition") then
+            local bp = Instance.new("BodyPosition")
+            bp.Name = "PullBodyPosition"
+            bp.MaxForce = Vector3.new(1e5,1e5,1e5)
+            bp.P = 1e4
+            bp.D = 500
+            bp.Parent = root
+            pulling = true
+            pullButton.Text = "Parar puxar"
+            -- Update target position continuously
+            local pullConnection
+            pullConnection = RunService.Heartbeat:Connect(function()
+                if not pulling or not selectedPlayer or not selectedPlayer.Character or not root.Parent then
+                    if bp and bp.Parent then
+                        bp:Destroy()
+                    end
+                    pullConnection:Disconnect()
+                    pulling = false
+                    pullButton.Text = "Puxar com Sofá"
+                    return
+                end
+                local targetPos = localRoot.Position + (localRoot.CFrame.LookVector * 3)
+                bp.Position = targetPos
+            end)
         end
-        local targetPos = localRoot.Position + (localRoot.CFrame.LookVector * 2)
-        local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(targetPos)})
-        tween:Play()
     end
 end)
 
--- Troll: Kill player by pushing into the void
+-- Kill player by pushing into the void
 local voidKillButton = Instance.new("TextButton")
 voidKillButton.Text = "Matar no Void"
 voidKillButton.Size = UDim2.new(0.9, 0, 0, 40)
@@ -197,241 +233,5 @@ voidKillButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 voidKillButton.TextColor3 = Color3.new(1,1,1)
 voidKillButton.Font = Enum.Font.GothamBold
 voidKillButton.TextSize = 20
+voidKillButton.ZIndex = 11
 voidKillButton.Parent = trollFrame
-
-voidKillButton.MouseButton1Click:Connect(function()
-    if selectedPlayer == nil then return end
-    local root = getRootPart(selectedPlayer)
-    if root then
-        -- Teleport player far below in the void
-        local voidPos = Vector3.new(root.Position.X, -500, root.Position.Z)
-        root.CFrame = CFrame.new(voidPos)
-    end
-end)
-
--- Troll: Freeze Player
-local freezeButton = Instance.new("TextButton")
-freezeButton.Text = "Congelar Jogador"
-freezeButton.Size = UDim2.new(0.9, 0, 0, 40)
-freezeButton.Position = UDim2.new(0.05, 0, 0, 240)
-freezeButton.BackgroundColor3 = Color3.fromRGB(150, 150, 50)
-freezeButton.TextColor3 = Color3.new(1,1,1)
-freezeButton.Font = Enum.Font.GothamBold
-freezeButton.TextSize = 20
-freezeButton.Parent = trollFrame
-
-local frozenPlayers = {}
-
-freezeButton.MouseButton1Click:Connect(function()
-    if selectedPlayer == nil then return end
-    local root = getRootPart(selectedPlayer)
-    if root then
-        local humanoid = selectedPlayer.Character and selectedPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid and not frozenPlayers[selectedPlayer] then
-            root.Anchored = true
-            frozenPlayers[selectedPlayer] = true
-            freezeButton.Text = "Descongelar Jogador"
-        elseif frozenPlayers[selectedPlayer] then
-            root.Anchored = false
-            frozenPlayers[selectedPlayer] = nil
-            freezeButton.Text = "Congelar Jogador"
-        end
-    end
-end)
-
--- Troll: Spin Player
-local spinButton = Instance.new("TextButton")
-spinButton.Text = "Girar Jogador"
-spinButton.Size = UDim2.new(0.9, 0, 0, 40)
-spinButton.Position = UDim2.new(0.05, 0, 0, 290)
-spinButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-spinButton.TextColor3 = Color3.new(1,1,1)
-spinButton.Font = Enum.Font.GothamBold
-spinButton.TextSize = 20
-spinButton.Parent = trollFrame
-
-local spinningPlayers = {}
-
-spinButton.MouseButton1Click:Connect(function()
-    if selectedPlayer == nil then return end
-    local root = getRootPart(selectedPlayer)
-    if root then
-        if not spinningPlayers[selectedPlayer] then
-            spinningPlayers[selectedPlayer] = true
-            local spinConnection
-            spinConnection = RunService.Heartbeat:Connect(function()
-                if selectedPlayer == nil or not spinningPlayers[selectedPlayer] or not root or not root.Parent then
-                    spinConnection:Disconnect()
-                    spinningPlayers[selectedPlayer] = nil
-                    return
-                end
-                root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(15), 0)
-            end)
-            spinButton.Text = "Parar Giro"
-        else
-            spinningPlayers[selectedPlayer] = nil
-            spinButton.Text = "Girar Jogador"
-        end
-    end
-end)
-
--- Floating Button for mobile (and desktop) to toggle hub visibility
-local toggleButton = Instance.new("TextButton")
-toggleButton.Name = "ToggleHubButton"
-toggleButton.Text = "Hub"
-toggleButton.Size = UDim2.new(0, 60, 0, 40)
-toggleButton.Position = UDim2.new(1, -65, 1, -50) -- bottom-right corner with margin
-toggleButton.AnchorPoint = Vector2.new(0, 0)
-toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-toggleButton.TextColor3 = Color3.new(1,1,1)
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 22
-toggleButton.AutoButtonColor = true
-toggleButton.Parent = ScreenGui
-
--- ================ ESP Section ===================
-local espEnabled = false
-local espFolder = nil
-local espObjects = {}
-
-local function createESPBox(player)
-    local box = Instance.new("BoxHandleAdornment")
-    box.Adornee = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    box.AlwaysOnTop = true
-    box.ZIndex = 10
-    box.Size = Vector3.new(4, 6, 4)
-    box.Transparency = 0.5
-    box.Color3 = Color3.fromRGB(0, 255, 0) -- verde
-    box.Parent = espFolder
-
-    local nameTag = Instance.new("TextLabel")
-    nameTag.BackgroundTransparency = 1
-    nameTag.TextColor3 = Color3.new(1, 1, 1)
-    nameTag.TextStrokeTransparency = 0
-    nameTag.TextStrokeColor3 = Color3.new(0, 0, 0)
-    nameTag.Text = player.Name
-    nameTag.Size = UDim2.new(0, 100, 0, 20)
-    nameTag.Font = Enum.Font.SourceSansBold
-    nameTag.TextScaled = true
-    nameTag.Parent = espFolder
-
-    return {
-        box = box,
-        nameTag = nameTag
-    }
-end
-
-local function updateESP()
-    if not espEnabled then return end
-    for player, objects in pairs(espObjects) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player ~= localPlayer then
-            local rootPart = player.Character.HumanoidRootPart
-            objects.box.Adornee = rootPart
-
-            local head = player.Character:FindFirstChild("Head")
-            if head then
-                local headPos, onScreen = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                objects.nameTag.Position = UDim2.new(0, headPos.X - 50, 0, headPos.Y - 20)
-                objects.nameTag.Visible = onScreen and headPos.Z > 0
-            else
-                objects.nameTag.Visible = false
-            end
-        else
-            if objects.box then
-                objects.box.Adornee = nil
-            end
-            if objects.nameTag then
-                objects.nameTag.Visible = false
-            end
-        end
-    end
-end
-
-local function addPlayerESP(player)
-    if player == localPlayer then return end
-    player.CharacterAdded:Connect(function(character)
-        wait(1)
-        if not espEnabled then return end
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            if not espObjects[player] then
-                espObjects[player] = createESPBox(player)
-            end
-            espObjects[player].box.Adornee = character.HumanoidRootPart
-            espObjects[player].nameTag.Visible = true
-        end
-    end)
-end
-
-local function removePlayerESP(player)
-    if espObjects[player] then
-        if espObjects[player].box then
-            espObjects[player].box:Destroy()
-        end
-        if espObjects[player].nameTag then
-            espObjects[player].nameTag:Destroy()
-        end
-        espObjects[player] = nil
-    end
-end
-
-local function enableESP()
-    if espEnabled then return end
-    espEnabled = true
-    espFolder = Instance.new("Folder")
-    espFolder.Name = "ESP"
-    espFolder.Parent = ScreenGui
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            espObjects[player] = createESPBox(player)
-        end
-        addPlayerESP(player)
-    end
-
-    Players.PlayerAdded:Connect(function(player)
-        if espEnabled then
-            addPlayerESP(player)
-        end
-    end)
-    Players.PlayerRemoving:Connect(function(player)
-        removePlayerESP(player)
-    end)
-
-    RunService.RenderStepped:Connect(updateESP)
-end
-
-local function disableESP()
-    espEnabled = false
-    if espFolder then
-        espFolder:Destroy()
-        espFolder = nil
-    end
-    espObjects = {}
-end
-
-espToggleButton.MouseButton1Click:Connect(function()
-    if not espEnabled then
-        enableESP()
-        espToggleButton.Text = "Desativar ESP"
-        espToggleButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-    else
-        disableESP()
-        espToggleButton.Text = "Ativar ESP"
-        espToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    end
-end)
-
--- Floating button toggles hub visibility
-toggleButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-end)
-
--- Atalho teclado para desktop ainda permanece (F6)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F6 then
-        mainFrame.Visible = not mainFrame.Visible
-    end
-end)
-
-print("Brookhaven Hub carregado. Use o botão 'Hub' na tela para abrir o menu no mobile ou pressione F6 no desktop.")
