@@ -1,10 +1,9 @@
--- Brookhaven Hub with ESP toggle and Fly (Infinity Yield style) script for Roblox
+-- Brookhaven Hub with ESP toggle script for Roblox
 -- Adapted for mobile users with a floating toggle button
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
@@ -15,8 +14,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 240)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -120)
+mainFrame.Size = UDim2.new(0, 300, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
@@ -60,17 +59,6 @@ espToggleButton.TextColor3 = Color3.new(1,1,1)
 espToggleButton.Font = Enum.Font.GothamBold
 espToggleButton.TextSize = 22
 espToggleButton.Parent = mainFrame
-
--- Fly Toggle Button
-local flyToggleButton = Instance.new("TextButton")
-flyToggleButton.Text = "Ativar Fly"
-flyToggleButton.Size = UDim2.new(0.8, 0, 0, 45)
-flyToggleButton.Position = UDim2.new(0.1, 0, 0, 115)
-flyToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-flyToggleButton.TextColor3 = Color3.new(1,1,1)
-flyToggleButton.Font = Enum.Font.GothamBold
-flyToggleButton.TextSize = 22
-flyToggleButton.Parent = mainFrame
 
 -- Floating Button for mobile (and desktop) to toggle hub visibility
 local toggleButton = Instance.new("TextButton")
@@ -218,149 +206,6 @@ espToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- ================ Fly Section ===================
-local flyEnabled = false
-local flySpeed = 50
-local flying = false
-local bodyVelocity, bodyGyro
-
-local userInput = {
-    forward = false,
-    backward = false,
-    left = false,
-    right = false,
-    up = false,
-    down = false,
-}
-
-local function startFly()
-    local character = localPlayer.Character
-    if not character then return end
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
-
-    flying = true
-
-    bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.P = 9e4
-    bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bodyGyro.CFrame = humanoidRootPart.CFrame
-    bodyGyro.Parent = humanoidRootPart
-
-    bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Velocity = Vector3.new(0,0,0)
-    bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bodyVelocity.Parent = humanoidRootPart
-
-    local function updateFly()
-        if not flying then
-            bodyVelocity:Destroy()
-            bodyGyro:Destroy()
-            return
-        end
-        local cameraCFrame = workspace.CurrentCamera.CFrame
-        local moveDirection = Vector3.new()
-
-        if userInput.forward then
-            moveDirection = moveDirection + (cameraCFrame.LookVector)
-        end
-        if userInput.backward then
-            moveDirection = moveDirection - (cameraCFrame.LookVector)
-        end
-        if userInput.left then
-            moveDirection = moveDirection - (cameraCFrame.RightVector)
-        end
-        if userInput.right then
-            moveDirection = moveDirection + (cameraCFrame.RightVector)
-        end
-        if userInput.up then
-            moveDirection = moveDirection + Vector3.new(0,1,0)
-        end
-        if userInput.down then
-            moveDirection = moveDirection - Vector3.new(0,1,0)
-        end
-
-        moveDirection = moveDirection.Unit
-        if moveDirection ~= moveDirection then -- check NaN
-            moveDirection = Vector3.new(0,0,0)
-        end
-        bodyVelocity.Velocity = moveDirection * flySpeed
-        bodyGyro.CFrame = cameraCFrame
-    end
-
-    RunService:BindToRenderStep("FlyUpdate", Enum.RenderPriority.Character.Value, updateFly)
-end
-
-local function stopFly()
-    flying = false
-    RunService:UnbindFromRenderStep("FlyUpdate")
-    if bodyVelocity then
-        bodyVelocity:Destroy()
-        bodyVelocity = nil
-    end
-    if bodyGyro then
-        bodyGyro:Destroy()
-        bodyGyro = nil
-    end
-end
-
-flyToggleButton.MouseButton1Click:Connect(function()
-    if not flyEnabled then
-        flyEnabled = true
-        flyToggleButton.Text = "Desativar Fly"
-        flyToggleButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-        startFly()
-    else
-        flyEnabled = false
-        flyToggleButton.Text = "Ativar Fly"
-        flyToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        stopFly()
-    end
-end)
-
--- Input handling for fly controls
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if flyEnabled then
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            if input.KeyCode == Enum.KeyCode.W then
-                userInput.forward = true
-            elseif input.KeyCode == Enum.KeyCode.S then
-                userInput.backward = true
-            elseif input.KeyCode == Enum.KeyCode.A then
-                userInput.left = true
-            elseif input.KeyCode == Enum.KeyCode.D then
-                userInput.right = true
-            elseif input.KeyCode == Enum.KeyCode.Space then
-                userInput.up = true
-            elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.C then
-                userInput.down = true
-            end
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if flyEnabled then
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            if input.KeyCode == Enum.KeyCode.W then
-                userInput.forward = false
-            elseif input.KeyCode == Enum.KeyCode.S then
-                userInput.backward = false
-            elseif input.KeyCode == Enum.KeyCode.A then
-                userInput.left = false
-            elseif input.KeyCode == Enum.KeyCode.D then
-                userInput.right = false
-            elseif input.KeyCode == Enum.KeyCode.Space then
-                userInput.up = false
-            elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.C then
-                userInput.down = false
-            end
-        end
-    end
-end)
-
 -- Floating button toggles hub visibility
 toggleButton.MouseButton1Click:Connect(function()
     mainFrame.Visible = not mainFrame.Visible
@@ -375,3 +220,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 print("Brookhaven Hub carregado. Use o botão 'Hub' na tela para abrir o menu no mobile ou pressione F6 no desktop.")
+
